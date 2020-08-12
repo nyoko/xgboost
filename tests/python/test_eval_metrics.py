@@ -1,35 +1,33 @@
 import xgboost as xgb
+import testing as tm
 import numpy as np
-from sklearn.cross_validation import KFold, train_test_split
-from sklearn.metrics import mean_squared_error
-from sklearn.grid_search import GridSearchCV
-from sklearn.datasets import load_iris, load_digits, load_boston
 import unittest
+import pytest
 
 rng = np.random.RandomState(1337)
 
 
 class TestEvalMetrics(unittest.TestCase):
     xgb_params_01 = {
-        'silent': 1,
+        'verbosity': 0,
         'nthread': 1,
         'eval_metric': 'error'
     }
 
     xgb_params_02 = {
-        'silent': 1,
+        'verbosity': 0,
         'nthread': 1,
         'eval_metric': ['error']
     }
 
     xgb_params_03 = {
-        'silent': 1,
+        'verbosity': 0,
         'nthread': 1,
         'eval_metric': ['rmse', 'error']
     }
 
     xgb_params_04 = {
-        'silent': 1,
+        'verbosity': 0,
         'nthread': 1,
         'eval_metric': ['error', 'rmse']
     }
@@ -42,17 +40,30 @@ class TestEvalMetrics(unittest.TestCase):
         labels = dtrain.get_label()
         return [('error', float(sum(labels != (preds > 0.0))) / len(labels))]
 
+    @pytest.mark.skipif(**tm.no_sklearn())
     def evalerror_03(self, preds, dtrain):
+        from sklearn.metrics import mean_squared_error
+
         labels = dtrain.get_label()
         return [('rmse', mean_squared_error(labels, preds)),
                 ('error', float(sum(labels != (preds > 0.0))) / len(labels))]
 
+    @pytest.mark.skipif(**tm.no_sklearn())
     def evalerror_04(self, preds, dtrain):
+        from sklearn.metrics import mean_squared_error
+
         labels = dtrain.get_label()
         return [('error', float(sum(labels != (preds > 0.0))) / len(labels)),
                 ('rmse', mean_squared_error(labels, preds))]
 
+    @pytest.mark.skipif(**tm.no_sklearn())
     def test_eval_metrics(self):
+        try:
+            from sklearn.model_selection import train_test_split
+        except ImportError:
+            from sklearn.cross_validation import train_test_split
+        from sklearn.datasets import load_digits
+
         digits = load_digits(2)
         X = digits['data']
         y = digits['target']

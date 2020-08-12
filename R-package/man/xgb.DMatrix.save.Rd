@@ -4,12 +4,12 @@
 \alias{xgb.DMatrix.save}
 \title{Save xgb.DMatrix object to binary file}
 \usage{
-xgb.DMatrix.save(DMatrix, fname)
+xgb.DMatrix.save(dmatrix, fname)
 }
 \arguments{
-\item{DMatrix}{the DMatrix object}
+\item{dmatrix}{the \code{xgb.DMatrix} object}
 
-\item{fname}{the name of the binary file.}
+\item{fname}{the name of the file to write.}
 }
 \description{
 Save xgb.DMatrix object to binary file
@@ -20,5 +20,5 @@ train <- agaricus.train
 dtrain <- xgb.DMatrix(train$data, label=train$label)
 xgb.DMatrix.save(dtrain, 'xgb.DMatrix.data')
 dtrain <- xgb.DMatrix('xgb.DMatrix.data')
+if (file.exists('xgb.DMatrix.data')) file.remove('xgb.DMatrix.data')
 }
-

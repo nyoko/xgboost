@@ -1,36 +1,71 @@
 environment:
-  global:
-   CMD_IN_ENV: "cmd /E:ON /V:ON /C .\\python-appveyor-demo\\appveyor\\run_with_env.cmd"
-   DISABLE_OPENMP: 1
-   VisualStudioVersion: 12.0
-   
-  matrix:
-    - PYTHON: "C:\\Python27-x64"
-      PYTHON_VERSION: "2.7.x" # currently 2.7.9
-      PYTHON_ARCH: "64"
+    matrix:
+        - target: msvc
+          ver: 2015
+          generator: "Visual Studio 14 2015 Win64"
+          configuration: Debug
+        - target: msvc
+          ver: 2015
+          generator: "Visual Studio 14 2015 Win64"
+          configuration: Release
+        - target: mingw
+          generator: "Unix Makefiles"
 
-    - PYTHON: "C:\\Python33-x64"
-      PYTHON_VERSION: "3.3.x" # currently 3.3.5
-      PYTHON_ARCH: "64"
+#matrix:
+#    fast_finish: true
 
 platform:
-  - x64
-
-configuration:
-  - Release
+    - x64
 
 install:
-  - cmd: git clone https://github.com/ogrisel/python-appveyor-demo
-  - ECHO "Filesystem root:"
-  - ps: "ls \"C:/\""
+    - git submodule update --init --recursive
+    # MinGW
+    - set PATH=C:\msys64\mingw64\bin;C:\msys64\usr\bin;%PATH%
+    - gcc -v
+    - ls -l C:\
+    # Miniconda3
+    - call C:\Miniconda3-x64\Scripts\activate.bat
+    - conda info
+    - where python
+    - python --version
+    # do python build for mingw and one of the msvc jobs
+    - set DO_PYTHON=off
+    - if /i "%target%" == "mingw" set DO_PYTHON=on
+    - if /i "%target%_%ver%_%configuration%" == "msvc_2015_Release" set DO_PYTHON=on
+    - if /i "%DO_PYTHON%" == "on" (
+        conda config --set always_yes true &&
+        conda update -q conda &&
+        conda install -y numpy scipy pandas matplotlib pytest scikit-learn graphviz python-graphviz hypothesis
+      )
+    - set PATH=C:\Miniconda3-x64\Library\bin\graphviz;%PATH%
 
-  - ECHO "Installed SDKs:"
-  - ps: "ls \"C:/Program Files/Microsoft SDKs/Windows\""
+build_script:
+    - cd %APPVEYOR_BUILD_FOLDER%
+    - if /i "%target%" == "msvc" (
+        mkdir build_msvc%ver% &&
+        cd build_msvc%ver% &&
+        cmake .. -G"%generator%" -DCMAKE_CONFIGURATION_TYPES="Release;Debug;" &&
+        msbuild xgboost.sln
+      )
+    - if /i "%target%" == "mingw" (
+        mkdir build_mingw &&
+        cd build_mingw &&
+        cmake .. -G"%generator%" &&
+        make -j2
+      )
+    # Python package
+    - if /i "%DO_PYTHON%" == "on" (
+        cd %APPVEYOR_BUILD_FOLDER%\python-package &&
+        python setup.py install &&
+        mkdir wheel &&
+        python setup.py bdist_wheel --universal --plat-name win-amd64 -d wheel
+      )
 
-  - ps: python-appveyor-demo\appveyor\install.ps1
-  - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
-  - "python --version"
-  - "python -c \"import struct; print(struct.calcsize('P') * 8)\""
+test_script:
+    - cd %APPVEYOR_BUILD_FOLDER%
+    - if /i "%DO_PYTHON%" == "on" python -m pytest tests/python
 
-build: off
-  #project: windows\xgboost.sln
+artifacts:
+    # binary Python wheel package
+    - path: '**\*.whl'
+      name: Bits
